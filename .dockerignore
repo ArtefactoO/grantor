@@ -1,0 +1,8 @@
+bin/
+.git/
+.gitignore
+docs/
+scripts/
+*.md
+.golangci.yml
+.gitlab-ci.yml

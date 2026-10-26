@@ -1,0 +1,55 @@
+# Keep default rules. Only exact reviewed content in its exact file is ignored.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Password-generation alphabet in internal/adapter/adapterutil/credential.go"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(^|/)internal/adapter/adapterutil/credential\.go$''']
+regexes = ['''(?m)^[ \t]*PasswordAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[ \t]*$''']
+
+[[rules.allowlists]]
+description = "Disposable test literal in internal/adapters/mysql/mysql_integration_test.go"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(^|/)internal/adapters/mysql/mysql_integration_test\.go$''']
+regexes = ['''(?m)^[ \t]*fixturePassword = "Fixture-Pass-1"[ \t]*$''']
+
+[[rules.allowlists]]
+description = "Disposable test literal in internal/api/api_integration_test.go"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(^|/)internal/api/api_integration_test\.go$''']
+regexes = ['''(?m)^[ \t]*const testSessionSecret = "0123456789abcdef0123456789abcdef"[ \t]*$''']
+
+[[rules.allowlists]]
+description = "Disposable test literal in internal/api/managed_link_integration_test.go"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(^|/)internal/api/managed_link_integration_test\.go$''']
+regexes = ['''(?m)^[ \t]*const password = "provided-secret-marker-123"[ \t]*$''']
+
+[[rules.allowlists]]
+description = "Password-generation alphabet in internal/core/credentials/principal.go"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(^|/)internal/core/credentials/principal\.go$''']
+regexes = ['''(?m)^[ \t]*const passwordAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[ \t]*$''']
+
+[[rules.allowlists]]
+description = "Idempotency-key comparison in internal/jobs/executor_connector_test.go"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(^|/)internal/jobs/executor_connector_test\.go$''']
+regexes = ['''(?m)^[ \t]*if jobV1\.IdempotencyKey == jobV2\.IdempotencyKey \{[ \t]*$''']
+
+[[rules.allowlists]]
+description = "Disposable test literal in internal/providers/yopass/client_test.go"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(^|/)internal/providers/yopass/client_test\.go$''']
+regexes = ['''(?m)^[ \t]*const secretID = "0123456789ABCDEFGHIJKL"[ \t]*$''']

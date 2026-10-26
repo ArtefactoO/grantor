@@ -1,0 +1,29 @@
+/bin/
+/dist/
+*.test
+coverage.out
+sbom.cdx.json
+.trivycache/
+.DS_Store
+.env
+.idea/
+.vscode/
+.claude/
+
+# Local Graphify runtime and rebuild state; commit graph artifacts, not caches.
+/graphify-out*
+
+# Local credentials, caches and generated previews
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+node_modules/
+dist/
+.cache/
+.artifacts/
+anti-slop/
+graphify-out/
+pki/
+*.key
+*.pem

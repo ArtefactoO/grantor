@@ -1,0 +1,23 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - gocritic
+    - misspell
+  settings:
+    misspell:
+      locale: US
+      ignore-rules:
+        # Статус операции в схеме БД и архитектуре — британское написание.
+        - cancelled
+        # Значение поля error в ответах RabbitMQ Management API: британское
+        # написание отличает отказ авторизации от отказа аутентификации
+        # ("not_authorized"), и различать их обязан rabbitmq adapter.
+        - authorised
+        - authorisation
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

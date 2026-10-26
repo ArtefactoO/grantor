@@ -1,0 +1,206 @@
+/* Grantor theme contract. Components consume semantic tokens only; palette
+   and mode are orthogonal attributes on <html>. Monochrome Signal is the
+   default palette, while data-theme is resolved from system preference before
+   the application renders and may then be changed explicitly. */
+
+:root {
+  --bg: #1d2023;
+  --panel: #23272b;
+  --panel2: #292e33;
+  --hover: #30363c;
+  --selected: #353c43;
+  /* На тёмных палитрах разделитель держится близко к заливке панели: линия
+     светлее фона воспринимается как источник света, и на периметре крупной
+     панели прежний #3b4249 читался как обводка, а не как край материала. */
+  --line: #2e3338;
+  --line-strong: #4b545d;
+  --text: #c7ccd1;
+  --muted: #a2aab2;
+  --faint: #a2aab2;
+  --accent: #bcc3c9;
+  --accent-text: #bcc3c9;
+  --accent-hover: #c9cfd4;
+  --accent-ink: #202429;
+  --focus: #aab3bc;
+  --ok: #88cbaa;
+  --warn: #cea65c;
+  --danger: #e99189;
+  --unmg: #a1aab3;
+  --shadow-color: #101214;
+  --topline: #30343a;
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #e2e6e8;
+  --panel: #dce1e3;
+  --panel2: #e9ecee;
+  --hover: #d5dbde;
+  --selected: #ced6da;
+  --line: #bac3c8;
+  --line-strong: #a2adb4;
+  --text: #41484e;
+  --muted: #525b63;
+  --faint: #525b63;
+  --accent: #46515a;
+  --accent-text: #46515a;
+  --accent-hover: #3c464e;
+  --accent-ink: #eceff1;
+  --focus: #52606b;
+  --ok: #1e583e;
+  --warn: #735114;
+  --danger: #94433d;
+  --unmg: #505962;
+  --shadow-color: #7f8991;
+  --topline: #f5f6f7;
+  color-scheme: light;
+}
+
+/* Graphite + Cobalt: cold graphite surfaces and one restrained action accent. */
+:root[data-palette='cobalt'] {
+  --bg: #1c2229;
+  --panel: #232a32;
+  --panel2: #29323c;
+  --hover: #303b46;
+  --selected: #354352;
+  --line: #2e3842;
+  --line-strong: #4b5b6b;
+  --text: #c7d0d9;
+  --muted: #a6b2bf;
+  --faint: #a6b2bf;
+  --accent: #7594d0;
+  --accent-text: #a5bff1;
+  --accent-hover: #83a0d7;
+  --accent-ink: #1b2533;
+  --focus: #91aae0;
+  --ok: #97d4b7;
+  --warn: #d9b265;
+  --danger: #ef9991;
+  --unmg: #a0afc0;
+  --shadow-color: #10161e;
+  --topline: #303947;
+  color-scheme: dark;
+}
+
+:root[data-palette='cobalt'][data-theme='light'] {
+  --bg: #e0e6eb;
+  --panel: #d9e1e6;
+  --panel2: #e8edf1;
+  --hover: #d2dce4;
+  --selected: #cbd8e3;
+  --line: #b7c4cf;
+  --line-strong: #9eafbd;
+  --text: #3d4954;
+  --muted: #4e5d6a;
+  --faint: #4e5d6a;
+  --accent: #4b6fae;
+  --accent-text: #2c4b83;
+  --accent-hover: #41639d;
+  --accent-ink: #f0f3f6;
+  --focus: #526d9c;
+  --ok: #1e583d;
+  --warn: #755719;
+  --danger: #924640;
+  --unmg: #4d5c6b;
+  --shadow-color: #74808c;
+  --topline: #f6f7f8;
+  color-scheme: light;
+}
+
+/* Carbon + Signal Orange: neutral carbon, clean orange without copper wash. */
+:root[data-palette='orange'] {
+  --bg: #1e1f1f;
+  --panel: #242626;
+  --panel2: #2a2d2d;
+  --hover: #313535;
+  --selected: #383a39;
+  --line: #303333;
+  --line-strong: #515655;
+  --text: #cccac6;
+  --muted: #aaa69e;
+  --faint: #aaa69e;
+  --accent: #d98b52;
+  --accent-text: #efb68b;
+  --accent-hover: #e19a62;
+  --accent-ink: #2a1e16;
+  --focus: #c69370;
+  --ok: #87c8a7;
+  --warn: #cba458;
+  --danger: #e89188;
+  --unmg: #aaa49b;
+  --shadow-color: #12110f;
+  --topline: #34322d;
+  color-scheme: dark;
+}
+
+:root[data-palette='orange'][data-theme='light'] {
+  --bg: #e5e4e0;
+  --panel: #deddd8;
+  --panel2: #eceae6;
+  --hover: #d7d6d0;
+  --selected: #ded3ca;
+  --line: #c0bdb5;
+  --line-strong: #a7a39a;
+  --text: #47443e;
+  --muted: #5a564e;
+  --faint: #5a564e;
+  --accent: #a45427;
+  --accent-text: #7a3f1e;
+  --accent-hover: #984e24;
+  --accent-ink: #f3efeb;
+  --focus: #8f542f;
+  --ok: #20573f;
+  --warn: #755819;
+  --danger: #92443e;
+  --unmg: #58544d;
+  --shadow-color: #817a70;
+  --topline: #f7f5f1;
+  color-scheme: light;
+}
+
+:root {
+  --ok-soft: color-mix(in srgb, var(--ok) 12%, transparent);
+  --warn-soft: color-mix(in srgb, var(--warn) 12%, transparent);
+  --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
+  --unmg-soft: color-mix(in srgb, var(--unmg) 10%, transparent);
+  --accent-soft: color-mix(in srgb, var(--accent) 11%, transparent);
+  --selection-outline: color-mix(in srgb, var(--accent) 24%, var(--line));
+  --highlight-inset: inset 0 1px 0 color-mix(in srgb, var(--topline) 34%, transparent);
+  --shadow-floating: 0 8px 24px color-mix(in srgb, var(--shadow-color) 32%, transparent);
+  --motion-fast: 90ms;
+  --motion-state: 130ms;
+  --motion-feedback: 130ms;
+  --ease-feedback: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel2);
+  --color-hover: var(--hover);
+  --color-selected: var(--selected);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-focus: var(--focus);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-unmg: var(--unmg);
+  --color-unmg-soft: var(--unmg-soft);
+
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'SF Mono', 'Cascadia Mono',
+    Menlo, Consolas, monospace;
+}

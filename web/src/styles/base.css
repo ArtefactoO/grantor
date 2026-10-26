@@ -1,0 +1,10 @@
+/* Tailwind scans the workspace source explicitly, including after npm linking. */
+@import 'tailwindcss';
+@import '@project/ui/styles.css';
+@source '../../packages/project-ui/src';
+
+html,
+body,
+#root {
+  height: 100%;
+}
