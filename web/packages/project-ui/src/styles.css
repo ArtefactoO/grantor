@@ -1,0 +1,178 @@
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/ibm-plex-mono/600.css';
+@import './tokens.css';
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Action feedback has no delay and never moves the control or its label. */
+.ui-button,
+.ui-icon-button,
+.ui-selection-chip,
+.ui-metadata-chip,
+.ui-facet-select,
+.ui-control-feedback,
+.ui-selection-surface,
+.ui-table-row {
+  transition:
+    color var(--motion-state) var(--ease-feedback),
+    background-color var(--motion-state) var(--ease-feedback),
+    border-color var(--motion-state) var(--ease-feedback),
+    box-shadow var(--motion-state) var(--ease-feedback),
+    opacity var(--motion-fast) var(--ease-feedback);
+  transition-delay: 0ms;
+}
+
+.ui-control-feedback:not(:disabled):active {
+  opacity: 0.82;
+}
+
+/* Pressed filters keep readable text; the border supplies the feedback. */
+.ui-selection-chip.ui-control-feedback:not(:disabled):active {
+  opacity: 1;
+  border-color: var(--focus);
+}
+
+.ui-selection-chip:not(:disabled)[aria-checked='false']:hover,
+.ui-selection-chip:not(:disabled)[aria-pressed='false']:hover,
+label.ui-selection-chip:hover {
+  background: color-mix(in srgb, var(--hover) 72%, transparent);
+  border-color: color-mix(in srgb, var(--line-strong) 72%, transparent);
+}
+
+.ui-table-row:not(.ui-interactive-row):hover {
+  background-color: color-mix(in srgb, var(--hover) 38%, transparent);
+}
+
+.ui-interactive-row:not([aria-selected='true']):is(:hover, :focus-visible) {
+  color: var(--text);
+  background-color: color-mix(in srgb, var(--hover) 82%, var(--panel));
+}
+
+.ui-interactive-row[aria-selected='true']:hover {
+  background-color: color-mix(in srgb, var(--selected) 88%, var(--hover));
+}
+
+/* Radix keeps a closing popover mounted until this short fade completes. */
+.ui-popover-surface[data-state='open'] {
+  animation: ui-surface-in var(--motion-state) var(--ease-feedback);
+}
+
+.ui-popover-surface[data-state='closed'] {
+  animation: ui-surface-out var(--motion-fast) var(--ease-feedback) forwards;
+}
+
+.ui-tooltip {
+  animation: ui-surface-in var(--motion-fast) var(--ease-feedback);
+}
+
+/* The icon and success colour acknowledge copying without a travelling sweep. */
+.ui-copy-glyph {
+  display: grid;
+  place-items: center;
+}
+
+.ui-copy-glyph > svg {
+  grid-area: 1 / 1;
+  transition: opacity var(--motion-fast) var(--ease-feedback);
+}
+
+.ui-copy-success,
+.ui-copy-glyph[data-copied] .ui-copy-idle {
+  opacity: 0;
+}
+
+.ui-copy-glyph[data-copied] .ui-copy-success {
+  opacity: 1;
+}
+
+/* Repeating movement belongs only to an active sync operation. */
+.ui-sync-glyph {
+  animation: ui-sync-glyph 1050ms linear infinite;
+}
+
+.ui-sync-arc {
+  animation: ui-sync-arc 900ms linear infinite;
+}
+
+@keyframes ui-surface-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ui-surface-out {
+  to { opacity: 0; }
+}
+
+@keyframes ui-sync-glyph {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ui-sync-arc {
+  to { transform: rotate(-360deg); }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Keep colour feedback; remove repeated motion and surface fades explicitly.
+   JS overlays use their own reduced-motion path, so centering stays intact. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .ui-popover-surface[data-state],
+  .ui-tooltip,
+  .ui-sync-glyph,
+  .ui-sync-arc {
+    animation: none;
+  }
+
+  .ui-copy-glyph > svg {
+    transition: none;
+  }
+}
+
+/* Narrow layouts and touch input need full targets without enlarging desktop actions. */
+@media (width < 640px), (pointer: coarse) {
+  .grantor-touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .grantor-touch-notice {
+    min-height: 44px;
+  }
+}

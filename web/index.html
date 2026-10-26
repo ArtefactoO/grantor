@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grantor</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Resolve the whole-app mode before CSS paints: an explicit choice wins,
+      // otherwise follow the operating-system preference.
+      ;(function () {
+        try {
+          var saved = localStorage.getItem('grantor-theme')
+          var theme =
+            saved === 'light' || saved === 'dark'
+              ? saved
+              : window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark'
+          document.documentElement.dataset.theme = theme
+          // Palette is orthogonal to mode. Monochrome Signal is represented by
+          // the base :root tokens, so it needs no data attribute.
+          var palette = localStorage.getItem('grantor-palette')
+          if (palette && palette !== 'signal' &&
+              ['cobalt', 'orange'].indexOf(palette) !== -1) {
+            document.documentElement.dataset.palette = palette
+          }
+        } catch (e) {
+          document.documentElement.dataset.theme = 'dark'
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

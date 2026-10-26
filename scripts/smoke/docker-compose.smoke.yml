@@ -1,0 +1,78 @@
+# Смоук-оверлей dev-контура (docs/local-smoke.md): target-контейнеры всех
+# движков, webhook-sink и короткие интервалы обслуживания. Образы и dev-креды
+# повторяют scripts/test-integration.sh. Только для локального прогона:
+#
+#   docker compose -f docker-compose.yml \
+#     -f scripts/smoke/docker-compose.smoke.yml up -d --build
+services:
+  api:
+    environment:
+      GRANTOR_RATE_LIMIT: "false"
+      GRANTOR_APPROVAL_MASS_REVOKE_THRESHOLD: "3"
+
+  worker:
+    environment:
+      GRANTOR_MAINTENANCE_INTERVAL: 15s
+      GRANTOR_WEBHOOK_URL: http://webhook-sink:8080/hook
+      GRANTOR_WEBHOOK_INTERVAL: 5s
+      GRANTOR_WEBHOOK_TIMEOUT: 5s
+
+  webhook-sink:
+    image: python:3.13-alpine
+    command: ["python", "-u", "/sink.py"]
+    volumes:
+      - ./scripts/smoke/webhook-sink.py:/sink.py:ro
+
+  target-mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: grantor-mysql
+      MYSQL_ROOT_HOST: "%"
+
+  target-mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: grantor-mongo
+
+  target-rabbitmq:
+    image: rabbitmq:3.13-management
+    hostname: target-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: grantor
+      RABBITMQ_DEFAULT_PASS: grantor-rabbit
+
+  target-clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_USER: grantor
+      CLICKHOUSE_PASSWORD: grantor-clickhouse
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+
+  # SASL-пользователь создаётся после старта:
+  #   docker exec grantor-target-redpanda-1 \
+  #     rpk security user create grantor -p grantor-redpanda
+  target-redpanda:
+    image: redpandadata/redpanda:v25.2.9
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --memory=512M
+      - --overprovisioned
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://target-redpanda:9092
+      - --rpc-addr=0.0.0.0:33145
+      - --advertise-rpc-addr=target-redpanda:33145
+      # Пары "--set значение": форма --set=key=value ломает парсер rpk.
+      - --set
+      - redpanda.enable_sasl=true
+      - --set
+      - redpanda.sasl_mechanisms=["SCRAM","PLAIN"]
+      - --set
+      - redpanda.superusers=["grantor"]
+
+  target-redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "grantor-redis"]

@@ -1,0 +1,306 @@
+# Dev-контур grantor целиком в Docker: PostgreSQL + Vault (dev mode) +
+# Dex + Yopass (memcached backend) + миграции + api + worker + ui
+# (nginx) + target-postgres («подопытная» база для discovery). Запуск:
+# docker compose up --build.
+#
+# Host-порты сдвинуты в диапазон 5xxxx, чтобы не конфликтовать с другими
+# локальными проектами (5432/8080/8081 часто заняты):
+#   postgres 55432, target-postgres 55433, authentik 59000, vault 58200,
+#   ui 58080 (nginx: статика UI + прокси /api и /auth на api),
+#   api напрямую 58082 (отладка и vite dev proxy), worker 58081,
+#   yopass web/api 58090.
+#
+# Секреты здесь dev-only (grantor/grantor, dev root token) и не имеют
+# отношения к production.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: grantor
+      POSTGRES_PASSWORD: grantor
+      POSTGRES_DB: grantor
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - grantor-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grantor -d grantor"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  vault:
+    image: hashicorp/vault:1.20
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: grantor-dev-root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "127.0.0.1:58200:8200"
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD-SHELL", "VAULT_ADDR=http://127.0.0.1:8200 vault status"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  # Authentik — dev-контур внешнего IdP. Заменил Dex, потому что даёт то,
+  # чего у Dex нет: группы в claim и каталог людей поверх собственного API.
+  # Это позволяет проверять локально ровно тот путь, который будет в
+  # production (там Authentik свой, как Vault и Yopass).
+  #
+  # Своя база и кэш живут в отдельной сети authentik: их сервисные имена
+  # postgres/redis совпадают с сервисами grantor, и в общей сети алиасы
+  # перебивали бы друг друга по DNS.
+  authentik-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: authentik
+      POSTGRES_DB: authentik
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [authentik]
+
+  authentik-redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [authentik]
+
+  authentik:
+    image: ghcr.io/goauthentik/server:2025.2.4
+    command: server
+    environment: &authentik-env
+      AUTHENTIK_SECRET_KEY: grantor-local-authentik-secret-key-not-for-production
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_BOOTSTRAP_PASSWORD: grantor
+      AUTHENTIK_BOOTSTRAP_TOKEN: grantor-local-bootstrap-token
+      AUTHENTIK_BOOTSTRAP_EMAIL: akadmin@grantor.dev
+      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    ports:
+      - "127.0.0.1:59000:9000"
+    depends_on:
+      authentik-postgres: {condition: service_healthy}
+      authentik-redis: {condition: service_healthy}
+    networks: [authentik, default]
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2025.2.4
+    command: worker
+    environment: *authentik-env
+    depends_on:
+      authentik-postgres: {condition: service_healthy}
+      authentik-redis: {condition: service_healthy}
+    networks: [authentik, default]
+
+  # Одноразовая настройка: группы, стендовые люди и OIDC-провайдер.
+  # Идемпотентна, поэтому выполняется при каждом подъёме стека.
+  authentik-bootstrap:
+    image: python:3.13-alpine
+    command: ["python", "/bootstrap.py"]
+    environment:
+      AUTHENTIK_URL: http://authentik:9000
+      AUTHENTIK_TOKEN: grantor-local-bootstrap-token
+      GRANTOR_OIDC_REDIRECT_URL: http://localhost:58080/auth/callback
+      GRANTOR_OIDC_CLIENT_ID: grantor
+      GRANTOR_OIDC_CLIENT_SECRET: grantor-local-oidc-secret
+    volumes:
+      - ./scripts/authentik-bootstrap.py:/bootstrap.py:ro
+    depends_on:
+      authentik:
+        condition: service_started
+    restart: on-failure
+
+  # Yopass — канал одноразовой доставки credentials (раздел 18
+  # архитектуры): backend получает от API только шифртекст, ключ
+  # расшифровки живёт во фрагменте браузерной ссылки. Хранилище —
+  # memcached: секреты короткоживущие и не переживают перезапуск.
+  memcached:
+    image: memcached:1.6-alpine
+
+  yopass:
+    image: jhaals/yopass:latest
+    command: ["--memcached=memcached:11211", "--port=1337"]
+    ports:
+      - "127.0.0.1:58090:1337"
+    depends_on:
+      memcached:
+        condition: service_started
+
+  migrate:
+    build: .
+    entrypoint: ["/usr/local/bin/grantor-migrate"]
+    environment:
+      GRANTOR_DB_DSN: postgres://grantor:grantor@postgres:5432/grantor?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: .
+    entrypoint: ["/usr/local/bin/grantor-api"]
+    # Прямой доступ к api для отладки и vite dev proxy; браузерный вход —
+    # через ui на 58080. GRANTOR_OIDC_REDIRECT_URL остаётся на 58080:
+    # nginx проксирует /auth на api, поэтому OIDC-callback работает как
+    # прежде.
+    ports:
+      - "127.0.0.1:58082:8080"
+    environment:
+      GRANTOR_DB_DSN: postgres://grantor:grantor@postgres:5432/grantor?sslmode=disable
+      GRANTOR_VAULT_ADDR: http://vault:8200
+      GRANTOR_VAULT_TOKEN: grantor-dev-root
+      # Vault dev mode монтирует KV v2 в "secret", а не в "grantor".
+      GRANTOR_VAULT_MOUNT: secret
+      # Yopass: API ходит по внутреннему адресу compose-сети, браузерные
+      # ссылки ведут на host-порт 58090.
+      GRANTOR_YOPASS_API_URL: http://yopass:1337
+      GRANTOR_YOPASS_PUBLIC_URL: http://localhost:58090
+      # OIDC через Dex: discovery/token exchange — по внутреннему адресу,
+      # браузер — через host-порт 55557 (rewrite ниже; см. internal/auth).
+      # Authentik объявляет issuer по Host запроса, поэтому контейнер и
+      # браузер обязаны обращаться по одному имени. host.docker.internal
+      # виден изнутри контейнера, браузеру — нет: его подменяет
+      # GRANTOR_OIDC_PUBLIC_URL_REWRITE.
+      GRANTOR_OIDC_ISSUER_URL: http://host.docker.internal:59000/application/o/grantor/
+      GRANTOR_OIDC_CLIENT_ID: grantor
+      GRANTOR_OIDC_CLIENT_SECRET: grantor-local-oidc-secret
+      GRANTOR_OIDC_REDIRECT_URL: http://localhost:58080/auth/callback
+      GRANTOR_OIDC_PUBLIC_URL_REWRITE: http://host.docker.internal:59000=http://localhost:59000
+      # Роли выдаются по группам Authentik; персональных списков нет.
+      GRANTOR_RBAC_ADMIN_GROUPS: grantor-admins
+      GRANTOR_RBAC_OPERATOR_GROUPS: grantor-operators
+      GRANTOR_RBAC_VIEWER_GROUPS: grantor-viewers
+      # Каталог: тот же Authentik, но через его собственный API — LDAP
+      # outpost стенду не нужен. Человек адресуется логином, а не почтой:
+      # адрес меняется (фамилия, домен), логин нет. Субъект обязан
+      # совпадать с sub_mode OIDC-провайдера, иначе вход и каталог
+      # адресовали бы одного человека по-разному.
+      GRANTOR_IDP_MODE: authentik
+      GRANTOR_IDP_PROVIDER: authentik
+      GRANTOR_IDP_AUTHENTIK_URL: http://authentik:9000
+      # Стендовый токен: тот же AUTHENTIK_BOOTSTRAP_TOKEN, что и у
+      # bootstrap. В production токен приходит из Vault.
+      GRANTOR_IDP_AUTHENTIK_TOKEN: grantor-local-bootstrap-token
+      GRANTOR_SESSION_SECRET: grantor-dev-session-secret-32bytes!
+      # Маппинг dev-пользователей Dex на роли grantor. Роли — только по
+      # явному назначению (GRANTOR_RBAC_DEFAULT_ROLE=none по умолчанию):
+      # viewer тоже выдаётся списком, как в production.
+      GRANTOR_RBAC_ADMIN_EMAILS: admin@grantor.dev
+      GRANTOR_RBAC_OPERATOR_EMAILS: operator@grantor.dev
+      GRANTOR_RBAC_VIEWER_EMAILS: viewer@grantor.dev
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      vault:
+        condition: service_healthy
+      # У Authentik healthcheck не объявлен: он поднимается дольше прочих,
+      # а API сам повторяет OIDC discovery до минуты на старте. У yopass
+      # healthcheck тоже нет (distroless), но клиент ленивый: соединение
+      # нужно только в момент выдачи ссылки.
+      authentik:
+        condition: service_started
+      yopass:
+        condition: service_started
+    # healthcheck намеренно отсутствует: runtime-образ distroless без
+    # shell/curl; снаружи доступны /health/live и /health/ready.
+
+  # UI: nginx со статикой SPA (Dockerfile.web) и прокси /api, /auth,
+  # /health, /metrics на api. Браузерная точка входа dev-контура —
+  # http://localhost:58080.
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "127.0.0.1:58080:80"
+    depends_on:
+      api:
+        condition: service_started
+
+  worker:
+    build: .
+    entrypoint: ["/usr/local/bin/grantor-worker"]
+    ports:
+      - "127.0.0.1:58081:8081"
+    environment:
+      GRANTOR_DB_DSN: postgres://grantor:grantor@postgres:5432/grantor?sslmode=disable
+      GRANTOR_VAULT_ADDR: http://vault:8200
+      GRANTOR_VAULT_TOKEN: grantor-dev-root
+      # Vault dev mode монтирует KV v2 в "secret", а не в "grantor".
+      GRANTOR_VAULT_MOUNT: secret
+      # Поллинг статусов внешних identity делает worker, поэтому каталог
+      # нужен и ему — с теми же параметрами, что у api.
+      # Каталог: тот же Authentik, но через его собственный API — LDAP
+      # outpost стенду не нужен. Человек адресуется логином, а не почтой:
+      # адрес меняется (фамилия, домен), логин нет. Субъект обязан
+      # совпадать с sub_mode OIDC-провайдера, иначе вход и каталог
+      # адресовали бы одного человека по-разному.
+      GRANTOR_IDP_MODE: authentik
+      GRANTOR_IDP_PROVIDER: authentik
+      GRANTOR_IDP_AUTHENTIK_URL: http://authentik:9000
+      # Стендовый токен: тот же AUTHENTIK_BOOTSTRAP_TOKEN, что и у
+      # bootstrap. В production токен приходит из Vault.
+      GRANTOR_IDP_AUTHENTIK_TOKEN: grantor-local-bootstrap-token
+      # Сверка версий credential с Vault (ADR-0018).
+      GRANTOR_CREDENTIAL_CHECK_INTERVAL: 1h
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      vault:
+        condition: service_healthy
+
+  # Постоянная «подопытная» целевая база для dev: её discovery выполняет
+  # worker после регистрации через API. Добавить как connection (логин
+  # admin@grantor.dev / grantor, CSRF token — из GET /auth/me):
+  #
+  #   curl -b cookies.txt -H "X-Grantor-CSRF: <csrf_token>" \
+  #     -H "Content-Type: application/json" \
+  #     -d '{"display_name":"target (dev)","engine":"postgres",
+  #          "environment":"dev","endpoints":["target-postgres:5432"],
+  #          "discovery_config":{"database":"appdb"},
+  #          "admin_credential":{"username":"grantor_admin","password":"grantor-target"}}' \
+  #     http://localhost:58080/api/v1/connections
+  #
+  # Затем POST http://localhost:58080/api/v1/connections/<id>/refresh.
+  target-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: grantor_admin
+      POSTGRES_PASSWORD: grantor-target
+      POSTGRES_DB: appdb
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - grantor-target-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grantor_admin -d appdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  grantor-pg-data:
+  grantor-target-pg-data:
+
+networks:
+  # Изолированная сеть базы и кэша Authentik: их сервисные имена совпадают
+  # с сервисами grantor, и в общей сети DNS-алиасы конфликтовали бы.
+  authentik: {}
+  default: {}
